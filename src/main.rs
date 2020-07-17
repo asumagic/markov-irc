@@ -7,22 +7,19 @@ use ircbot::*;
 use markov::*;
 use markovtrainer::*;
 
+mod ircbot;
+mod logparse;
+mod markov;
 mod markovtrainer;
 mod msgprocessor;
-mod logparse;
-mod ircbot;
-mod markov;
 
-struct CommandImpersonate<'a>
-{
+struct CommandImpersonate<'a> {
     impersonated: &'a str,
     hook: &'a str,
 }
 
-impl<'a> CommandImpersonate<'a>
-{
-    fn from(words: &'a [&str]) -> Result<Self>
-    {
+impl<'a> CommandImpersonate<'a> {
+    fn from(words: &'a [&str]) -> Result<Self> {
         let bad_syntax = || anyhow!("expected args: [user] [hook word]");
 
         Ok(CommandImpersonate {
@@ -31,10 +28,17 @@ impl<'a> CommandImpersonate<'a>
         })
     }
 
-    fn handle(sender: &Sender, markovs: &HashMap<String, Markov>, target: &str, words: &'a [&str]) -> Result<()> {
+    fn handle(
+        sender: &Sender,
+        markovs: &HashMap<String, Markov>,
+        target: &str,
+        words: &'a [&str],
+    ) -> Result<()> {
         let cmd = Self::from(&words)?;
 
-        let markov = markovs.get(cmd.impersonated).ok_or_else(|| anyhow!(r#"user "{}" not found"#, &cmd.impersonated))?;
+        let markov = markovs
+            .get(cmd.impersonated.to_lowercase().as_str())
+            .ok_or_else(|| anyhow!(r#"user "{}" not found"#, &cmd.impersonated))?;
 
         let min_length = 4usize;
         let max_length = 20usize;
@@ -43,7 +47,7 @@ impl<'a> CommandImpersonate<'a>
         let mut found_chain = false;
 
         for _ in 0..max_length {
-            random_chain = markov.random_chain(cmd.hook)?;
+            random_chain = markov.random_chain(cmd.hook.to_lowercase().as_str())?;
 
             if random_chain.len() >= min_length {
                 found_chain = true;
@@ -52,7 +56,11 @@ impl<'a> CommandImpersonate<'a>
         }
 
         if !found_chain {
-            return Err(anyhow!(r#"did not manage to generate a sentence of >={} words within {} iterations"#, min_length, max_length));
+            return Err(anyhow!(
+                r#"did not manage to generate a sentence of >={} words within {} iterations"#,
+                min_length,
+                max_length
+            ));
         }
 
         sender.send_privmsg(&target, random_chain.join(" "))?;
@@ -63,15 +71,18 @@ impl<'a> CommandImpersonate<'a>
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let markovs = markov_from_logs(&["/home/sdelang/logs/mibbit_#cbna.log",
-        "/home/sdelang/logs/freenode_#cbna.log"]);
+    let markovs = markov_from_logs(&[
+        "/home/sdelang/logs/mibbit_#cbna.log",
+        "/home/sdelang/logs/freenode_#cbna.log",
+    ]);
 
     let mut bot = Bot::new(irc::client::prelude::Config {
         nickname: Some("asubot".to_owned()),
         server: Some("chat.freenode.net".to_owned()),
         channels: vec!["#cbna-bot-spam".to_owned(), "#cbna".to_owned()],
         ..Default::default()
-    }).await?;
+    })
+    .await?;
 
     let client = &bot.client;
     let sender = &client.sender();
@@ -87,7 +98,9 @@ async fn main() -> Result<()> {
                     let args: Vec<&str> = splits.collect();
                     match command {
                         "~impersonate" => {
-                            if let Err(err) = CommandImpersonate::handle(&sender, &markovs, &target, &args) {
+                            if let Err(err) =
+                                CommandImpersonate::handle(&sender, &markovs, &target, &args)
+                            {
                                 bot.send_error(&target, Some(&message), err).unwrap();
                             }
                         }

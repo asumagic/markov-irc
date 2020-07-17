@@ -1,10 +1,9 @@
 use anyhow::*;
-use irc::client::ClientStream;
 use irc::client::prelude::*;
+use irc::client::ClientStream;
 use tokio::stream::StreamExt;
 
-pub struct Bot
-{
+pub struct Bot {
     pub client: Client,
     pub stream: ClientStream,
 }
@@ -28,10 +27,20 @@ impl Bot {
 
         match message {
             Some(message) => {
-                sender.send_privmsg(&target, std::format!("{}: error: {}", message.source_nickname().ok_or_else(|| anyhow!("wat"))?, error.root_cause()))?;
+                sender.send_privmsg(
+                    &target,
+                    std::format!(
+                        "{}: error: {}",
+                        message.source_nickname().ok_or_else(|| anyhow!("wat"))?,
+                        error.root_cause()
+                    ),
+                )?;
             }
             None => {
-                sender.send_privmsg(&target, std::format!("general error: {}", error.root_cause()))?;
+                sender.send_privmsg(
+                    &target,
+                    std::format!("general error: {}", error.root_cause()),
+                )?;
             }
         }
 

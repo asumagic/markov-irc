@@ -5,8 +5,7 @@ pub struct ProcessedMessage {
     pub words: Vec<String>,
 }
 
-impl ProcessedMessage
-{
+impl ProcessedMessage {
     pub fn from(msg: LogMessage) -> ProcessedMessage {
         ProcessedMessage {
             user: msg

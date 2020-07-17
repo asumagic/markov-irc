@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::*;
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 
 struct Node {
     name: String,
@@ -33,8 +33,7 @@ impl Markov {
     }
 
     pub fn insert(&mut self, name: String, pred: String) {
-        self
-            .nodes
+        self.nodes
             .entry(name.clone())
             .or_insert_with(|| Node::new(name.clone()));
 
@@ -47,7 +46,10 @@ impl Markov {
         let mut rng = thread_rng();
 
         let mut words = Vec::new();
-        let mut current = self.nodes.get(hook_word).ok_or_else(|| anyhow!(r#"hook word "{}" not found for this user"#, hook_word))?;
+        let mut current = self
+            .nodes
+            .get(hook_word)
+            .ok_or_else(|| anyhow!(r#"hook word "{}" not found for this user"#, hook_word))?;
 
         loop {
             if current.successors.is_empty() || current.name.is_empty() {

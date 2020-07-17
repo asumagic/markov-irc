@@ -10,8 +10,7 @@ use crate::msgprocessor::ProcessedMessage;
 pub fn markov_from_logs(log_files: &'static [&str]) -> HashMap<String, Markov> {
     let (tx, rx) = mpsc::channel();
 
-    for path in log_files.iter()
-    {
+    for path in log_files.iter() {
         let tx = tx.clone();
 
         std::thread::spawn(move || {
