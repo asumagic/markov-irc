@@ -33,7 +33,7 @@ impl Markov {
     }
 
     pub fn insert(&mut self, name: String, pred: String) {
-        let node = self
+        self
             .nodes
             .entry(name.clone())
             .or_insert_with(|| Node::new(name.clone()));

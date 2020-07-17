@@ -36,9 +36,26 @@ impl<'a> CommandImpersonate<'a>
 
         let markov = markovs.get(cmd.impersonated).ok_or_else(|| anyhow!(r#"user "{}" not found"#, &cmd.impersonated))?;
 
-        let random_chain = markov.random_chain(cmd.hook)?;
+        let min_length = 4usize;
+        let max_length = 20usize;
 
-        sender.send_privmsg(&target, random_chain.join(" "));
+        let mut random_chain = Vec::new();
+        let mut found_chain = false;
+
+        for _ in 0..max_length {
+            random_chain = markov.random_chain(cmd.hook)?;
+
+            if random_chain.len() >= min_length {
+                found_chain = true;
+                break;
+            }
+        }
+
+        if !found_chain {
+            return Err(anyhow!(r#"did not manage to generate a sentence of >={} words within {} iterations"#, min_length, max_length));
+        }
+
+        sender.send_privmsg(&target, random_chain.join(" "))?;
 
         Ok(())
     }
@@ -70,9 +87,8 @@ async fn main() -> Result<()> {
                     let args: Vec<&str> = splits.collect();
                     match command {
                         "~impersonate" => {
-                            match CommandImpersonate::handle(&sender, &markovs, &target,&args) {
-                                Ok(cmd) => {}
-                                Err(err) => { bot.send_error(&target, Some(&message), err); }
+                            if let Err(err) = CommandImpersonate::handle(&sender, &markovs, &target, &args) {
+                                bot.send_error(&target, Some(&message), err).unwrap();
                             }
                         }
                         _ => {}
