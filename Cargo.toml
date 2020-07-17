@@ -13,3 +13,4 @@ tokio = { version = "0.2", features = ["macros", "net", "stream", "time"] }
 regex = "1.3"
 lazy_static = "1.1.1"
 rand = "0.7"
+fxhash = "0.2.1"

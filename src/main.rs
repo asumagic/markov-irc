@@ -1,3 +1,4 @@
+use fxhash::FxHashMap;
 use std::collections::HashMap;
 
 use anyhow::*;
@@ -15,22 +16,20 @@ mod msgprocessor;
 
 struct CommandImpersonate<'a> {
     impersonated: &'a str,
-    hook: &'a str,
 }
 
 impl<'a> CommandImpersonate<'a> {
     fn from(words: &'a [&str]) -> Result<Self> {
-        let bad_syntax = || anyhow!("expected args: [user] [hook word]");
+        let bad_syntax = || anyhow!("expected args: [user]");
 
         Ok(CommandImpersonate {
             impersonated: words.get(0).ok_or_else(bad_syntax)?,
-            hook: words.get(1).ok_or_else(bad_syntax)?,
         })
     }
 
     fn handle(
         sender: &Sender,
-        markovs: &HashMap<String, Markov>,
+        markovs: &FxHashMap<String, Markov>,
         target: &str,
         words: &'a [&str],
     ) -> Result<()> {
@@ -47,7 +46,7 @@ impl<'a> CommandImpersonate<'a> {
         let mut found_chain = false;
 
         for _ in 0..max_length {
-            random_chain = markov.random_chain(cmd.hook.to_lowercase().as_str())?;
+            random_chain = markov.random_chain()?;
 
             if random_chain.len() >= min_length {
                 found_chain = true;
@@ -75,6 +74,10 @@ async fn main() -> Result<()> {
         "/home/sdelang/logs/mibbit_#cbna.log",
         "/home/sdelang/logs/freenode_#cbna.log",
     ]);
+
+    for i in 0..100 {
+        println!("{}", markovs["asu"].random_chain()?.join(" "));
+    }
 
     let mut bot = Bot::new(irc::client::prelude::Config {
         nickname: Some("asubot".to_owned()),

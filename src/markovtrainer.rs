@@ -1,3 +1,4 @@
+use fxhash::FxHashMap;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader};
@@ -7,7 +8,7 @@ use crate::logparse::LogMessage;
 use crate::markov::Markov;
 use crate::msgprocessor::ProcessedMessage;
 
-pub fn markov_from_logs(log_files: &'static [&str]) -> HashMap<String, Markov> {
+pub fn markov_from_logs(log_files: &'static [&str]) -> FxHashMap<String, Markov> {
     let (tx, rx) = mpsc::channel();
 
     for path in log_files.iter() {
@@ -40,7 +41,7 @@ pub fn markov_from_logs(log_files: &'static [&str]) -> HashMap<String, Markov> {
     // not sure if there is a better way - we clone the tx into each thread but we are not sending anything from the main thread.
     std::mem::drop(tx);
 
-    let mut markovs = HashMap::new();
+    let mut markovs = FxHashMap::default();
 
     for msg in rx {
         let markov = markovs.entry(msg.user).or_insert_with(|| Markov::new());
@@ -49,19 +50,7 @@ pub fn markov_from_logs(log_files: &'static [&str]) -> HashMap<String, Markov> {
             continue;
         }
 
-        for i in 0..msg.words.len() {
-            let default_string = String::new();
-            let prev = if i == 0 {
-                &default_string
-            } else {
-                &msg.words[i - 1]
-            };
-            let cur = &msg.words[i];
-
-            markov.insert(cur.clone(), prev.clone());
-        }
-
-        markov.insert(String::new(), msg.words.last().unwrap().to_string());
+        markov.insert_sentence(msg.words);
     }
 
     markovs

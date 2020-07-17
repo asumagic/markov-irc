@@ -1,66 +1,114 @@
-use std::collections::HashMap;
+use fxhash::FxHashMap;
 
 use anyhow::*;
 use rand::{thread_rng, Rng};
 
+type WordIndex = u32;
+
+const WORD_SENTENCE_BEGIN: WordIndex = 0;
+const WORD_SENTENCE_END: WordIndex = 1;
+const WORD_USER_BEGIN: WordIndex = 2;
+
 struct Node {
-    name: String,
-    successors: Vec<String>,
+    succs: Vec<Vec<WordIndex>>,
 }
 
 impl Node {
-    fn new(name: String) -> Self {
-        Self {
-            name,
-            successors: Vec::new(),
-        }
-    }
-
-    fn add_succ(&mut self, succ: String) {
-        self.successors.push(succ);
+    fn new() -> Self {
+        Self { succs: Vec::new() }
     }
 }
 
 pub struct Markov {
-    nodes: HashMap<String, Node>,
+    word_matches: FxHashMap<String, WordIndex>,
+    nodes: FxHashMap<WordIndex, Node>,
+    latest_user_word: WordIndex,
 }
 
 impl Markov {
     pub fn new() -> Self {
         Self {
-            nodes: HashMap::new(),
+            word_matches: FxHashMap::default(),
+            nodes: FxHashMap::default(),
+            latest_user_word: WORD_USER_BEGIN,
         }
     }
 
-    pub fn insert(&mut self, name: String, pred: String) {
-        self.nodes
-            .entry(name.clone())
-            .or_insert_with(|| Node::new(name.clone()));
+    fn get_or_insert_word_index(&mut self, word: String) -> WordIndex {
+        // work around the borrow checker making me sad
+        let mut latest_word = self.latest_user_word;
 
-        if !pred.is_empty() {
-            self.nodes.get_mut(&pred).unwrap().add_succ(name);
+        let entry = *self.word_matches.entry(word).or_insert_with(|| {
+            latest_word += 1;
+            latest_word - 1
+        });
+
+        self.latest_user_word = latest_word;
+
+        entry
+    }
+
+    fn get_word_index(&self, word: &str) -> Option<&WordIndex> {
+        self.word_matches.get(word)
+    }
+
+    fn get_word_from_index(&self, word_index: WordIndex) -> Option<&str> {
+        // TODO: not a O(n) lookup
+        self.word_matches
+            .iter()
+            .find(|(_k, v)| **v == word_index)
+            .map(|(k, _v)| k.as_ref())
+    }
+
+    pub fn insert_word(&mut self, word: WordIndex, mut succs: &[WordIndex]) {
+        let current_entry = self.nodes.entry(word).or_insert_with(Node::new);
+
+        if !succs.is_empty() {
+            current_entry.succs.push(Vec::from(succs));
+            self.insert_word(succs[0], &succs[1..]);
         }
     }
 
-    pub fn random_chain(&self, hook_word: &str) -> Result<Vec<String>> {
+    pub fn insert_sentence(&mut self, sentence: Vec<String>) {
+        let mut word_indices = Vec::new();
+
+        word_indices.push(WORD_SENTENCE_BEGIN);
+        word_indices.extend(
+            sentence
+                .iter()
+                .map(|s| self.get_or_insert_word_index(s.to_string())),
+        );
+        word_indices.push(WORD_SENTENCE_END);
+
+        for i in 0..sentence.len() {
+            self.insert_word(word_indices[i], &word_indices[i + 1..]);
+        }
+    }
+
+    pub fn random_chain(&self) -> Result<Vec<&str>> {
         let mut rng = thread_rng();
 
         let mut words = Vec::new();
-        let mut current = self
+
+        let mut current_index = 0;
+        let mut current_node = self
             .nodes
-            .get(hook_word)
-            .ok_or_else(|| anyhow!(r#"hook word "{}" not found for this user"#, hook_word))?;
+            .get(&WORD_SENTENCE_BEGIN)
+            .ok_or_else(|| anyhow!("sentence begin node not found, dataset empty?"))?;
 
         loop {
-            if current.successors.is_empty() || current.name.is_empty() {
+            if current_node.succs.is_empty() || current_index == WORD_SENTENCE_END {
                 break;
             }
 
-            let random_succ = &current.successors[rng.gen_range(0, current.successors.len())];
+            let random_succ = &current_node.succs[rng.gen_range(0, current_node.succs.len())];
 
-            words.push(current.name.clone());
+            current_index = random_succ[0];
+            current_node = &self.nodes[&current_index];
 
-            current = &self.nodes[random_succ];
+            if current_index >= WORD_USER_BEGIN {
+                words.push(self.get_word_from_index(current_index).unwrap());
+            }
         }
 
         Ok(words)
