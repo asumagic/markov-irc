@@ -1,0 +1,15 @@
+[package]
+name = "markov-irc"
+version = "0.1.0"
+authors = ["Asu <sdelang@sdelang.fr>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+irc = "0.14"
+anyhow = "1.0"
+tokio = { version = "0.2", features = ["macros", "net", "stream", "time"] }
+regex = "1.3"
+lazy_static = "1.1.1"
+rand = "0.7"
